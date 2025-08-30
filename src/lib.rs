@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -206,4 +206,45 @@ mod test {
         assert!(res2.is_ok());
         assert_eq!(a.read().map(|v| *v), Some(5678));
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde() {
+        let original = RcuCell::new(0);
+        let serialized = serde_json::to_string(&original).unwrap();
+        assert_eq!(serialized, "0");
+
+        let deserialized: RcuCell<i32> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(*deserialized.read().unwrap(), 0);
+    }
 }
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "serde")]
+impl<T: Serialize> Serialize for RcuCell<T> where Arc<T>: Serialize {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.read().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for RcuCell<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = T::deserialize(deserializer)?;
+        Ok(RcuCell::new(value))
+    }
+}
+
+pub type ArcRCU<T> = RcuCell<T>;
+
+
+
+

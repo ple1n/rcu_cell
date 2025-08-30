@@ -15,7 +15,14 @@ exclude = [".gitignore", "benches/**"]
 
 [dependencies]
 crossbeam-utils = "0.8.20"
+serde = { version = "1.0", optional = true, features = ["derive", "rc"] }
+
+[features]
+default = ["serde", "std"]
+std = []
+serde = ["dep:serde"]
 
 [dev-dependencies]
 spin = "0.10"
 arc-swap = "1.7"
+serde_json = { version = "1.0", optional = false }
