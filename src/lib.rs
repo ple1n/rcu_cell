@@ -243,7 +243,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for RcuCell<T> {
     }
 }
 
-pub type ArcRCU<T> = RcuCell<T>;
+pub type ArcRCU<T> = Arc<RcuCell<T>>;
 
 
 
