@@ -5,9 +5,11 @@ extern crate alloc;
 
 mod link;
 mod rcu_cell;
+mod rcu_cell_nonnull;
 mod rcu_weak;
 
 pub use rcu_cell::RcuCell;
+pub use rcu_cell_nonnull::RcuCellNonNull;
 pub use rcu_weak::RcuWeak;
 
 // we only support 64-bit platform
@@ -41,6 +43,20 @@ impl<T> ArcPointer<T> for Option<Arc<T>> {
 
     unsafe fn from_raw(ptr: *const T) -> Self {
         (!ptr.is_null()).then(|| Arc::from_raw(ptr))
+    }
+}
+
+impl<T> ArcPointer<T> for Arc<T> {
+    fn as_ptr(&self) -> *const T {
+        Arc::as_ptr(self)
+    }
+
+    fn into_raw(self) -> *const T {
+        Arc::into_raw(self)
+    }
+
+    unsafe fn from_raw(ptr: *const T) -> Self {
+        Arc::from_raw(ptr)
     }
 }
 
@@ -220,31 +236,33 @@ mod test {
 }
 
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "serde")]
-impl<T: Serialize> Serialize for RcuCell<T> where Arc<T>: Serialize {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+mod ser {
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    impl<T: Serialize> Serialize for RcuCell<T>
     where
-        S: serde::Serializer,
+        Arc<T>: Serialize,
     {
-        self.read().serialize(serializer)
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.read().serialize(serializer)
+        }
     }
-}
 
-#[cfg(feature = "serde")]
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for RcuCell<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let value = T::deserialize(deserializer)?;
-        Ok(RcuCell::new(value))
+    impl<'de, T: Deserialize<'de>> Deserialize<'de> for RcuCell<T> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let value = T::deserialize(deserializer)?;
+            Ok(RcuCell::new(value))
+        }
     }
 }
 
 pub type ArcRCU<T> = Arc<RcuCell<T>>;
-
-
-
-
+pub type ArcRCUNonNull<T> = Arc<RcuCellNonNull<T>>;
